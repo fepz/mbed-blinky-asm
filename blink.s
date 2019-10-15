@@ -21,11 +21,29 @@
 .word   hang        /* 12 Debug Monitor */
 .word   hang        /* 13 RESERVED */
 .word   hang        /* 14 PendSV */
-.word   hang        /* 15 SysTick */
+.word   _systick    /* 15 SysTick */
 
 /* This directive indicates to assemble the following code into a the section
 name. See the flash.ld file for section layout. */
 .section ".text"
+
+.globl _systick
+.thumb_func
+_systick:
+    sub     r6, #1
+    bne     systickreturn
+    cmp     r4, #0x1
+    bne     led_off
+    mov     r4, #0x0
+    strb    r3, [r0]
+    mov     r6, r5
+    b       systickreturn
+led_off:
+    mov     r4, #0x1
+    strb    r3, [r1]
+    mov     r6, r5
+systickreturn:
+    bx      lr
 
 /* The .thumb_func directive specifies that the following symbol is the name
 of a Thumb encoded function. */
@@ -36,7 +54,7 @@ hang:
 /* Perform a busy waiting. */
 .thumb_func
 dowait:
-   ldr  r7, =0xA000       // store 0xA0000 in the r7 register
+   ldr  r7, =0xA0000       // store 0xA0000 in the r7 register
 dowaitloop:
    sub  r7, #1             // substract 1 from the value in r7
    bne  dowaitloop         // if r7 != 0, goto dowaitloop
@@ -46,6 +64,21 @@ dowaitloop:
 .thumb_func
 .globl _start
 _start:
+    ldr     r5, =0x2710
+    mov     r6, r5
+
+    ldr     r0, =0xE000E014
+    ldrb    r1, [r0]
+    ldr     r2, =0xEA5FF
+    orr     r1, r2
+    strb    r1, [r0]
+
+    ldr     r0, =0xE000E010
+    ldrb    r1, [r0]
+    mov     r2, #0x07
+    orr     r1, r2
+    strb    r1, [r0]
+
    ldr  r0, =0x2009C022    // load memory address 0x2009C022 into r0 register,
                            // this is the port direction register FIO1DIR2, see
                            // page 134 in LPC17xx manual.
@@ -53,7 +86,7 @@ _start:
    ldrb r1, [r0]           // load in r1 the value store in the memory address
                            // [r0], with immediate offset (unsigned byte).
 
-   mov  r2, #0x04          // store ‭the value 0000100‬ in r2, this value is used
+   mov  r2, #0x14          // store ‭the value 0000100‬ in r2, this value is used
                            // to change the direction mode of the GPIOs pins
                            // into which the mbed LPC1768 LED1 is connected.
 
@@ -65,7 +98,9 @@ _start:
 
    ldr  r1, =0x2009C03E    // clear gpio (FIO1CLR2, see page 136 in LPC17xx manual)
 
-   mov  r2, #0x04          // store the value 0100 in r2
+   mov  r2, #0x4          // store the value 0100 in r2
+   mov  r3, #0x10
+   mov  r4, #0x1
 
 mainloop:
    strb r2, [r0]           // store the value in r2 in the memory address [r0]
